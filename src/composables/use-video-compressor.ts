@@ -25,11 +25,15 @@ const createDefaultSettings = (): VideoCompressionSettings => ({
   quality: "high",
 });
 
-const isMp4File = (file: File): boolean =>
-  file.name.toLowerCase().endsWith(".mp4") && (!file.type || file.type === "video/mp4");
+const isSupportedVideoFile = (file: File): boolean => {
+  const fileName = file.name.toLowerCase();
+  if (fileName.endsWith(".mp4")) return !file.type || file.type === "video/mp4";
+  if (fileName.endsWith(".mov")) return !file.type || file.type === "video/quicktime";
+  return false;
+};
 
 const createOutputName = (fileName: string, usedNames: Set<string>): string => {
-  const baseName = fileName.replace(/\.mp4$/i, "");
+  const baseName = fileName.replace(/\.(mp4|mov)$/i, "");
   let outputName = `${baseName}-compressed.mp4`;
   let duplicateIndex = 2;
 
@@ -64,6 +68,7 @@ export const useVideoCompressor = ({ enabled }: UseVideoCompressorOptions) => {
       const base = {
         id: task.id,
         sourceName: task.sourceName,
+        originalSize: task.originalSize,
         duration: task.duration,
         sourceResolution: task.sourceResolution,
         sourceFrameRate: task.sourceFrameRate,
@@ -81,7 +86,6 @@ export const useVideoCompressor = ({ enabled }: UseVideoCompressorOptions) => {
           ...base,
           state: task.state,
           outputName: task.outputName,
-          originalSize: task.originalSize,
           compressedSize: task.compressedSize,
           savedPercentage: task.savedPercentage,
         };
@@ -283,10 +287,10 @@ export const useVideoCompressor = ({ enabled }: UseVideoCompressorOptions) => {
     const usedNames = new Set(tasks.value.map((task) => task.outputName.toLowerCase()));
     const newTasks = files.map((file) => {
       const task = createTask(file, createOutputName(file.name, usedNames));
-      if (!isMp4File(file)) {
+      if (!isSupportedVideoFile(file)) {
         task.state = "error";
         task.sourceResolution = "未知";
-        task.errorMessage = "仅支持 MP4 格式的视频";
+        task.errorMessage = "仅支持 MP4、MOV 格式的视频";
       }
       return task;
     });

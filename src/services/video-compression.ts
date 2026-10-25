@@ -9,9 +9,10 @@ import {
   Mp4OutputFormat,
   Output,
   Quality,
+  QTFF,
   canEncodeVideo,
 } from "mediabunny";
-import type { ConversionAudioOptions, InputAudioTrack, InputVideoTrack } from "mediabunny";
+import type { ConversionAudioOptions, InputAudioTrack, InputVideoTrack, VideoSample } from "mediabunny";
 
 import type { VideoCompressionQuality, VideoCompressionSettings, VideoOutputFrameRate } from "@/types/video-compressor";
 
@@ -28,6 +29,8 @@ interface VideoTransform extends VideoDimensions {
   /** 传给转换器的目标高度 */
   targetHeight?: number;
 }
+
+type VideoQualityTier = "4k" | "2k" | "1080p" | "720p";
 
 /** @description 视频元数据 */
 export interface VideoCompressionMetadata {
@@ -50,7 +53,7 @@ export interface VideoCompressionOutput extends VideoCompressionMetadata {
 }
 
 interface CompressVideoOptions {
-  /** 原始 MP4 文件 */
+  /** 原始 MP4 或 MOV 文件 */
   file: File;
   /** 压缩设置 */
   settings: VideoCompressionSettings;
@@ -117,10 +120,20 @@ const frameRateMap: Record<VideoOutputFrameRate, number | undefined> = {
   "60": 60,
 };
 
-//以样本视频的 1080p H.265 约 1.17 Mbps 作为高档基准
-const videoQualityMap: Record<VideoCompressionQuality, number> = {
-  medium: 0.1,
-  high: 0.3,
+//按最终输出分辨率和质量档位使用固定视频目标比特率，单位为 bits per second
+const videoBitrateMap: Record<VideoQualityTier, Record<VideoCompressionQuality, number>> = {
+  "4k": { low: 12_000_000, medium: 20_000_000, high: 30_000_000 },
+  "2k": { low: 6_000_000, medium: 10_000_000, high: 16_000_000 },
+  "1080p": { low: 3_000_000, medium: 6_000_000, high: 10_000_000 },
+  "720p": { low: 1_500_000, medium: 3_000_000, high: 5_000_000 },
+};
+
+const resolveVideoQualityTier = ({ width, height }: VideoDimensions): VideoQualityTier => {
+  const shortEdge = Math.min(width, height);
+  if (shortEdge >= 2160) return "4k";
+  if (shortEdge >= 1440) return "2k";
+  if (shortEdge >= 1080) return "1080p";
+  return "720p";
 };
 
 const describeDiscardedTrack = (reason: Conversion["discardedTracks"][number]["reason"]): string => {
@@ -130,7 +143,7 @@ const describeDiscardedTrack = (reason: Conversion["discardedTracks"][number]["r
     max_track_count_of_type_reached: "MP4 容器无法容纳此轨道",
     unknown_source_codec: "无法识别源视频或音频编码",
     undecodable_source_codec: "当前浏览器无法解码源视频或音频",
-    no_encodable_target_codec: "当前浏览器无法编码 H.265 或兼容音频",
+    no_encodable_target_codec: "当前浏览器无法编码视频或兼容音频",
   } as const;
 
   return reasonMap[reason];
@@ -174,25 +187,25 @@ const createVideoThumbnail = async (videoTrack: InputVideoTrack): Promise<Blob |
   return wrappedCanvas ? canvasToThumbnailBlob(wrappedCanvas.canvas) : null;
 };
 
-/** @description 检查当前浏览器是否具备基础 H.265 压缩能力 */
+/** @description 检查当前浏览器是否具备基础兼容压缩能力 */
 export const checkVideoCompressionSupport = async (): Promise<string> => {
   if (!("VideoEncoder" in globalThis) || !("VideoDecoder" in globalThis)) {
     return "当前浏览器不支持 WebCodecs，请使用最新版 Chrome 或 Edge";
   }
 
   try {
-    const supported = await canEncodeVideo("hevc", {
+    const supported = await canEncodeVideo("avc", {
       width: 640,
       height: 360,
-      quality: new Quality(0.1),
+      bitrate: 500_000,
     });
-    return supported ? "" : "当前设备不支持 H.265 编码";
+    return supported ? "" : "当前设备不支持兼容编码";
   } catch {
-    return "无法检测 H.265 编码能力，请使用最新版 Chrome 或 Edge";
+    return "无法检测兼容编码能力，请使用最新版 Chrome 或 Edge";
   }
 };
 
-/** @description 将单个 MP4 视频压缩为 H.265 MP4 */
+/** @description 将单个 MP4 或 MOV 视频压缩为兼容 MP4 */
 export const compressVideo = async ({
   file,
   settings,
@@ -203,7 +216,7 @@ export const compressVideo = async ({
 }: CompressVideoOptions): Promise<VideoCompressionOutput> => {
   const input = new Input({
     source: new BlobSource(file),
-    formats: [MP4],
+    formats: [MP4, QTFF],
   });
   let conversion: Conversion | undefined;
   const handleAbort = () => {
@@ -214,11 +227,12 @@ export const compressVideo = async ({
 
   try {
     throwIfCanceled(signal);
-    if (!(await input.canRead())) throw new Error("文件不是有效的 MP4 视频");
+    if (!(await input.canRead())) throw new Error("文件不是有效的 MP4 或 MOV 视频");
 
     const videoTrack = await input.getPrimaryVideoTrack();
-    if (!videoTrack) throw new Error("MP4 文件中没有可处理的视频轨道");
+    if (!videoTrack) throw new Error("MP4 或 MOV 文件中没有可处理的视频轨道");
     if (!(await videoTrack.canDecode())) throw new Error("当前浏览器无法解码此视频");
+    const isHdr = await videoTrack.hasHighDynamicRange();
 
     const [displayWidth, displayHeight, metadataDuration, primaryAudioTrack] = await Promise.all([
       videoTrack.getDisplayWidth(),
@@ -229,12 +243,10 @@ export const compressVideo = async ({
     const duration = metadataDuration ?? (await videoTrack.computeDuration());
     const transform = resolveVideoTransform({ width: displayWidth, height: displayHeight }, settings.resolution);
     let sourceFrameRate: number | undefined;
-    if (settings.frameRate !== "original") {
-      try {
-        sourceFrameRate = (await videoTrack.computeFrameRateMetrics()).bestGuessFrameRate;
-      } catch {
-        sourceFrameRate = undefined;
-      }
+    try {
+      sourceFrameRate = (await videoTrack.computeFrameRateMetrics()).bestGuessFrameRate;
+    } catch {
+      sourceFrameRate = undefined;
     }
     const metadata: VideoCompressionMetadata = {
       duration: formatDuration(duration),
@@ -257,32 +269,43 @@ export const compressVideo = async ({
       }
     }
 
-    const quality = new Quality(videoQualityMap[settings.quality]);
+    const qualityTier = resolveVideoQualityTier(transform);
+    const bitrate = videoBitrateMap[qualityTier][settings.quality];
     const frameRate = frameRateMap[settings.frameRate];
-    const canEncodeHevc = await canEncodeVideo("hevc", {
+    const canEncodeAvc = await canEncodeVideo("avc", {
       width: transform.width,
       height: transform.height,
-      quality,
+      bitrate,
       hardwareAcceleration: automaticHardwareAcceleration,
     });
-    if (!canEncodeHevc) throw new Error("当前设备不支持此分辨率的 H.265 编码");
+    if (!canEncodeAvc) throw new Error("当前设备不支持此分辨率的兼容编码");
 
     const format = new Mp4OutputFormat();
     const target = new BufferTarget();
     const output = new Output({ format, target });
+    const toneMapHdrSample = (sample: VideoSample) => sample.transform({});
+    const videoOptions = {
+      codec: "avc" as const,
+      bitrate,
+      hardwareAcceleration: automaticHardwareAcceleration,
+      forceTranscode: true,
+      frameRate,
+      width: transform.targetWidth,
+      height: transform.targetHeight,
+      //将目标帧率同步到编码能力探测，避免源视频帧率过高导致错误拒绝
+      onEncoderConfig: frameRate
+        ? (config: VideoEncoderConfig) => {
+            config.framerate = frameRate;
+          }
+        : undefined,
+      //HDR 视频先经过浏览器色彩映射，避免输出像素与色彩元数据不一致导致画面偏亮
+      process: isHdr ? toneMapHdrSample : undefined,
+    };
     conversion = await Conversion.init({
       input,
       output,
       tracks: "primary",
-      video: {
-        codec: "hevc",
-        quality,
-        hardwareAcceleration: automaticHardwareAcceleration,
-        forceTranscode: true,
-        frameRate,
-        width: transform.targetWidth,
-        height: transform.targetHeight,
-      },
+      video: videoOptions,
       audio: createAudioOptionsResolver(format),
     });
     throwIfCanceled(signal);
@@ -292,7 +315,7 @@ export const compressVideo = async ({
     );
     if (!conversion.isValid || discardedPrimaryTrack) {
       const reason = discardedPrimaryTrack?.reason ?? conversion.discardedTracks[0]?.reason;
-      throw new Error(reason ? describeDiscardedTrack(reason) : "当前视频无法转换为 H.265 MP4");
+      throw new Error(reason ? describeDiscardedTrack(reason) : "当前视频无法转换为兼容 MP4");
     }
 
     conversion.onProgress = (progress) => onProgress(progress * 100);

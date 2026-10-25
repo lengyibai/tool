@@ -17,6 +17,7 @@ declare module 'vue' {
     MediaToolHeader: typeof import('./../components/MediaToolHeader/index.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    SelectField: typeof import('./../components/SelectField/index.vue')['default']
     ToolRouteSwitch: typeof import('./../components/ToolRouteSwitch/index.vue')['default']
     VideoCompressorWorkspace: typeof import('./../components/VideoCompressorWorkspace/index.vue')['default']
   }

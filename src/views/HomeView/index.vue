@@ -28,7 +28,7 @@ const tools = [
     eyebrow: "VIDEO / 02",
     title: "视频压缩",
     description: "在浏览器本地压缩视频，快速得到更易分享、更省空间的文件。",
-    detail: "支持 MP4、WebM 等常见格式",
+    detail: "支持 MP4、MOV 等常见格式",
     tone: "blue",
   },
   {

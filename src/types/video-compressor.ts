@@ -4,7 +4,7 @@ export type VideoOutputResolution = "original" | "1080p" | "720p";
 
 export type VideoOutputFrameRate = "original" | "30" | "60";
 
-export type VideoCompressionQuality = "medium" | "high";
+export type VideoCompressionQuality = "low" | "medium" | "high";
 
 export type CompressionProgressPhase = "idle" | "preparing" | "compressing" | "stopped" | "done" | "error";
 
@@ -84,6 +84,8 @@ interface VideoCompressionResultBase {
   id: number;
   /** 原始文件名 */
   sourceName: string;
+  /** 原始文件体积 */
+  originalSize: number;
   /** 视频时长文本 */
   duration: string;
   /** 原始分辨率文本 */
@@ -130,8 +132,6 @@ export interface VideoCompressionSuccess extends VideoCompressionResultBase {
   state: "success";
   /** 输出文件名 */
   outputName: string;
-  /** 原始文件体积 */
-  originalSize: number;
   /** 压缩后文件体积 */
   compressedSize: number;
   /** 节省体积百分比 */

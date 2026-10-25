@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { LuChevronDown, LuFileWarning, LuFolderOpen, LuUpload } from "vue-icons-plus/lu";
+import { LuFileWarning, LuFolderOpen, LuUpload } from "vue-icons-plus/lu";
 
+import SelectField, { type SelectFieldOption } from "@/components/SelectField/index.vue";
 import type { VideoCompressionSettings } from "@/types/video-compressor";
 
 interface Props {
@@ -20,6 +21,18 @@ const $emit = defineEmits<{
 }>();
 const settings = defineModel<VideoCompressionSettings>("settings", { required: true });
 
+const resolutionOptions: SelectFieldOption[] = [
+  { value: "original", label: "原始尺寸" },
+  { value: "1080p", label: "1080p" },
+  { value: "720p", label: "720p" },
+];
+
+const frameRateOptions: SelectFieldOption[] = [
+  { value: "original", label: "原始帧率" },
+  { value: "60", label: "60 FPS" },
+  { value: "30", label: "30 FPS" },
+];
+
 /** 原生文件选择控件 */
 const fileInputRef = ref<HTMLInputElement>();
 /** 是否正在拖入文件 */
@@ -30,6 +43,19 @@ const canSelectFiles = computed(
 
 const handleSelectClick = () => {
   if (canSelectFiles.value) fileInputRef.value?.click();
+};
+
+const handleDropZoneClick = (event: MouseEvent) => {
+  if (event.target instanceof HTMLElement && event.target.closest("button")) return;
+  handleSelectClick();
+};
+
+const handleDropZoneKeydown = (event: KeyboardEvent) => {
+  if (event.target instanceof HTMLElement && event.target.closest("button")) return;
+  if (event.key !== "Enter" && event.key !== " ") return;
+
+  event.preventDefault();
+  handleSelectClick();
 };
 
 const handleFileChange = (event: Event) => {
@@ -69,19 +95,27 @@ const handleDrop = (event: DragEvent) => {
       <div class="settings-grid">
         <label class="setting-control">
           <span class="setting-label">分辨率</span>
-          <span class="select-field">
-            <select v-model="settings.resolution" :disabled="settingsLocked" aria-label="输出分辨率">
-              <option value="original">原始尺寸</option>
-              <option value="1080p">1080p</option>
-              <option value="720p">720p</option>
-            </select>
-            <LuChevronDown :size="17" aria-hidden="true" />
-          </span>
+          <SelectField
+            v-model="settings.resolution"
+            :options="resolutionOptions"
+            :disabled="settingsLocked"
+            ariaLabel="输出分辨率"
+          />
         </label>
 
         <div class="quality-control">
           <span class="setting-label">压缩质量</span>
           <div class="quality-options" role="radiogroup" aria-label="压缩质量">
+            <label>
+              <input
+                v-model="settings.quality"
+                type="radio"
+                name="compression-quality"
+                value="low"
+                :disabled="settingsLocked"
+              />
+              <span>低</span>
+            </label>
             <label>
               <input
                 v-model="settings.quality"
@@ -105,41 +139,16 @@ const handleDrop = (event: DragEvent) => {
           </div>
         </div>
 
-        <div class="frame-rate-control">
+        <label class="setting-control">
           <span class="setting-label">输出帧率</span>
-          <div class="frame-rate-options" role="radiogroup" aria-label="输出帧率">
-            <label title="保留原视频帧率">
-              <input
-                v-model="settings.frameRate"
-                type="radio"
-                name="output-frame-rate"
-                value="original"
-                :disabled="settingsLocked"
-              />
-              <span>原始</span>
-            </label>
-            <label title="输出为每秒 30 帧">
-              <input
-                v-model="settings.frameRate"
-                type="radio"
-                name="output-frame-rate"
-                value="30"
-                :disabled="settingsLocked"
-              />
-              <span>30</span>
-            </label>
-            <label title="输出为每秒 60 帧">
-              <input
-                v-model="settings.frameRate"
-                type="radio"
-                name="output-frame-rate"
-                value="60"
-                :disabled="settingsLocked"
-              />
-              <span>60</span>
-            </label>
-          </div>
-        </div>
+          <SelectField
+            v-model="settings.frameRate"
+            :options="frameRateOptions"
+            :disabled="settingsLocked"
+            ariaLabel="输出帧率"
+          />
+        </label>
+
       </div>
     </div>
 
@@ -147,16 +156,21 @@ const handleDrop = (event: DragEvent) => {
       class="drop-zone"
       :class="{ 'is-busy': filesLocked || compatibilityPending, 'is-dragging': dragActive }"
       :aria-disabled="!canSelectFiles"
+      :tabindex="canSelectFiles ? 0 : -1"
+      role="button"
+      aria-label="选择视频文件"
       @dragenter.prevent="handleDragEnter"
       @dragover.prevent
       @dragleave.prevent="handleDragLeave"
       @drop.prevent="handleDrop"
+      @click="handleDropZoneClick"
+      @keydown="handleDropZoneKeydown"
     >
       <input
         ref="fileInputRef"
         class="file-input"
         type="file"
-        accept=".mp4,video/mp4"
+        accept=".mp4,.mov,video/mp4,video/quicktime"
         multiple
         :disabled="!canSelectFiles"
         @change="handleFileChange"
@@ -165,7 +179,7 @@ const handleDrop = (event: DragEvent) => {
         <LuUpload :size="34" />
       </span>
       <span class="drop-title">{{ compatibilityPending ? "正在检测浏览器能力" : "拖放视频到这里" }}</span>
-      <span class="drop-subtitle">仅支持 MP4，可一次添加多个视频</span>
+      <span class="drop-subtitle">支持 MP4、MOV，可一次添加多个视频</span>
       <span v-if="compatibilityError" class="status-message is-error">
         <LuFileWarning :size="16" aria-hidden="true" />
         <span>{{ compatibilityError }}</span>
