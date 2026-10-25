@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import { LuArrowUpRight, LuCheck, LuFileImage, LuFilm, LuGithub, LuShieldCheck } from "vue-icons-plus/lu";
+import {
+  LuArrowUpRight,
+  LuAudioLines,
+  LuCheck,
+  LuFileAudio,
+  LuFileImage,
+  LuFilm,
+  LuGithub,
+  LuImage,
+  LuShieldCheck,
+} from "vue-icons-plus/lu";
 
 const tools = [
   {
@@ -20,6 +30,33 @@ const tools = [
     description: "在浏览器本地压缩视频，快速得到更易分享、更省空间的文件。",
     detail: "支持 MP4、WebM 等常见格式",
     tone: "blue",
+  },
+  {
+    path: "/audio",
+    icon: LuAudioLines,
+    eyebrow: "AUDIO / 03",
+    title: "音频裁剪",
+    description: "选择一段音频，试听并导出 MP3 文件。",
+    detail: "支持波形选区与精确时间输入",
+    tone: "amber",
+  },
+  {
+    path: "/audio-compress",
+    icon: LuFileAudio,
+    eyebrow: "AUDIO / 04",
+    title: "音频压缩",
+    description: "批量将音频转换为 MP3，按原音码率设置输出上限。",
+    detail: "逐项查看体积并批量下载",
+    tone: "blue",
+  },
+  {
+    path: "/gif",
+    icon: LuImage,
+    eyebrow: "GIF / 05",
+    title: "GIF 编辑",
+    description: "裁剪动画画面与时长，或把视频片段制作为 GIF。",
+    detail: "先生成预览，再决定下载",
+    tone: "mint",
   },
 ] as const;
 
@@ -45,7 +82,7 @@ const principles = [
         <div class="hero-copy">
           <span class="hero-kicker">YOUR FILES. YOUR DEVICE.</span>
           <span class="hero-title">把媒体处理，<br /><span>留在本地。</span></span>
-          <span class="hero-description">一个安静、快速的媒体工具箱。图片转换与视频压缩，无需上传，打开即用。</span>
+          <span class="hero-description">一个安静、快速的媒体工具箱。图片、视频和音频都在本地处理，打开即用。</span>
         </div>
         <div class="hero-orbit" aria-hidden="true">
           <span class="orbit-ring ring-one"></span>

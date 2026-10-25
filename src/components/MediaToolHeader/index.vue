@@ -3,7 +3,7 @@ import ToolRouteSwitch from "@/components/ToolRouteSwitch/index.vue";
 
 interface Props {
   /** 品牌图标地址 */
-  logoSrc: string;
+  logoSrc?: string;
   /** 页面标题 */
   title: string;
   /** 页面副标题 */
@@ -20,7 +20,8 @@ const githubUrl = "https://github.com/lengyibai/tool";
 <template>
   <div class="app-header">
     <div class="brand">
-      <img class="brand-mark" :src="logoSrc" alt="" />
+      <img v-if="logoSrc" class="brand-mark" :src="logoSrc" alt="" />
+      <div v-else class="brand-mark is-icon"><slot name="mark" /></div>
       <div class="brand-copy">
         <span class="brand-title">{{ title }}</span>
         <span class="brand-subtitle">{{ subtitle }}</span>

@@ -18,6 +18,14 @@
       height: 48px;
       border-radius: var(--radius-3);
       object-fit: contain;
+
+      &.is-icon {
+        display: grid;
+        place-items: center;
+        border: 1px solid fade(@accent, 35%);
+        color: @accent;
+        background: @accent-soft;
+      }
     }
 
     > .brand-copy {

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import { LuImage, LuVideo } from "vue-icons-plus/lu";
+import { LuAudioLines, LuFileAudio, LuFilm, LuImage, LuVideo } from "vue-icons-plus/lu";
 </script>
 
 <template>
-  <div class="tool-route-switch" role="group" aria-label="转换工具">
+  <div class="tool-route-switch" role="group" aria-label="媒体工具">
     <RouterLink to="/webp" exact-active-class="is-active" aria-label="切换到图片转换">
       <LuImage :size="17" aria-hidden="true" />
       <span>图片转换</span>
@@ -13,13 +13,25 @@ import { LuImage, LuVideo } from "vue-icons-plus/lu";
       <LuVideo :size="17" aria-hidden="true" />
       <span>视频压缩</span>
     </RouterLink>
+    <RouterLink to="/audio" exact-active-class="is-active" aria-label="切换到音频裁剪">
+      <LuAudioLines :size="17" aria-hidden="true" />
+      <span>音频裁剪</span>
+    </RouterLink>
+    <RouterLink to="/audio-compress" exact-active-class="is-active" aria-label="切换到音频压缩">
+      <LuFileAudio :size="17" aria-hidden="true" />
+      <span>音频压缩</span>
+    </RouterLink>
+    <RouterLink to="/gif" exact-active-class="is-active" aria-label="切换到 GIF 编辑器">
+      <LuFilm :size="17" aria-hidden="true" />
+      <span>GIF 编辑</span>
+    </RouterLink>
   </div>
 </template>
 
 <style scoped lang="less">
 .tool-route-switch {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   overflow: hidden;
   height: 50px;
   padding: 3px;
@@ -60,13 +72,29 @@ import { LuImage, LuVideo } from "vue-icons-plus/lu";
   }
 }
 
-@media (max-width: 479.98px) {
+@media (max-width: 1099.98px) {
+  .tool-route-switch > a {
+    width: 52px;
+    min-width: 0;
+
+    > span {
+      display: none;
+    }
+  }
+}
+
+@media (max-width: 767.98px) {
   .tool-route-switch {
     flex: 1;
 
     > a {
+      width: auto;
       min-width: 0;
       padding: 0 var(--gap-2);
+
+      > span {
+        display: none;
+      }
     }
   }
 }

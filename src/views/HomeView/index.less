@@ -57,7 +57,11 @@
 .label-top { top: var(--gap-3); right: -5px; }
 .label-bottom { bottom: var(--gap-4); left: 0; }
 
-.tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-5); }
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--gap-5);
+}
 .tool-card { position: relative; display: grid; min-height: 280px; padding: var(--gap-6); border: 1px solid @border; border-radius: var(--radius-3); color: @text; text-decoration: none; background: @surface; transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease; }
 .tool-card:hover { transform: translateY(-4px); border-color: @border-strong; background: @surface-hover; }
 .tool-card:focus-visible, .source-link:focus-visible, .brand:focus-visible { outline: 2px solid @accent; outline-offset: 3px; }
@@ -65,6 +69,9 @@
 .tool-eyebrow { font-size: 11px; font-weight: bold; letter-spacing: 0.13em; }
 .is-mint .tool-card-top > svg, .is-mint .tool-icon { color: @accent; }
 .is-blue .tool-card-top > svg, .is-blue .tool-icon { color: @info; }
+.is-amber .tool-card-top > svg, .is-amber .tool-icon {
+  color: @warning;
+}
 .tool-icon { display: grid; place-items: center; width: 54px; height: 54px; margin-top: var(--gap-7); border: 1px solid currentColor; border-radius: 50%; background: fade(#fff, 3%); }
 .tool-title { margin-top: var(--gap-4); font-size: 28px; font-weight: bold; }
 .tool-description { max-width: 430px; margin-top: var(--gap-2); color: @text-muted; font-size: 15px; }
@@ -87,6 +94,9 @@
   .hero-title { font-size: 58px; }
   .hero-orbit { width: 180px; height: 180px; margin-right: 0; transform: scale(0.78); }
   .tool-card { min-height: 260px; }
+  .tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .bottom-row { flex-direction: column; }
   .source-link { justify-content: center; min-height: 48px; }
 }

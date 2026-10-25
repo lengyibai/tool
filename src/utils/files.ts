@@ -40,6 +40,14 @@ export function toWebpName(fileName: string): string {
   return `${baseName}.webp`;
 }
 
+export function toMp3Name(fileName: string): string {
+  const normalizedName = fileName || "audio";
+  if (/\.mp3$/i.test(normalizedName)) return normalizedName;
+  const extensionIndex = normalizedName.lastIndexOf(".");
+  const baseName = extensionIndex > 0 ? normalizedName.slice(0, extensionIndex) : normalizedName;
+  return `${baseName}.mp3`;
+}
+
 export function createUniqueName(fileName: string, usedNames: Set<string>): string {
   const extensionIndex = fileName.lastIndexOf(".");
   const baseName = extensionIndex > 0 ? fileName.slice(0, extensionIndex) : fileName;

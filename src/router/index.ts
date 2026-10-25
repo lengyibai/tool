@@ -21,6 +21,24 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "视频压缩器" },
   },
   {
+    path: "/audio",
+    name: "audio-trimmer",
+    component: () => import("@/views/AudioTrimmerView/index.vue"),
+    meta: { title: "音频裁剪" },
+  },
+  {
+    path: "/audio-compress",
+    name: "audio-compressor",
+    component: () => import("@/views/AudioCompressorView/index.vue"),
+    meta: { title: "音频压缩" },
+  },
+  {
+    path: "/gif",
+    name: "gif-editor",
+    component: () => import("@/views/GifEditorView/index.vue"),
+    meta: { title: "GIF 编辑器" },
+  },
+  {
     path: "/:pathMatch(.*)*",
     redirect: "/",
   },
