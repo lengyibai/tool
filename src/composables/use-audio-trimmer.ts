@@ -59,6 +59,8 @@ const useAudioTrimmer = () => {
   let playStartTime = 0;
   let playStartFrame = 0;
   let pausedFrame: number | null = null;
+  let isScrubbing = false;
+  let resumeAfterScrub = false;
   let animationFrame = 0;
   let playId = 0;
   let loadId = 0;
@@ -154,6 +156,8 @@ const useAudioTrimmer = () => {
 
   const loadFile = async (nextFile: File) => {
     const currentLoad = ++loadId;
+    isScrubbing = false;
+    resumeAfterScrub = false;
     invalidateExport();
     stopPlayback();
     file.value = null;
@@ -203,6 +207,8 @@ const useAudioTrimmer = () => {
       nextSelection.startFrame >= nextSelection.endFrame
     )
       return;
+    isScrubbing = false;
+    resumeAfterScrub = false;
     stopPlayback();
     invalidateExport();
     selection.value = nextSelection;
@@ -269,8 +275,14 @@ const useAudioTrimmer = () => {
   };
 
   const seekPlayback = (frame: number) => {
-    if (!source || !buffer.value || !Number.isFinite(frame)) return;
+    if (!buffer.value || !Number.isFinite(frame)) return;
     const firstFrame = Math.max(selection.value.startFrame, Math.min(selection.value.endFrame - 1, Math.round(frame)));
+    if (!source) {
+      playId++;
+      pausedFrame = firstFrame;
+      playheadFrame.value = firstFrame;
+      return;
+    }
     stopPlayback();
     try {
       startPlayback(firstFrame);
@@ -281,7 +293,7 @@ const useAudioTrimmer = () => {
   };
 
   const togglePlayback = async () => {
-    if (!buffer.value || !audioContext || playPending.value) return;
+    if (!buffer.value || !audioContext || playPending.value || isScrubbing) return;
     if (source) {
       stopPlayback(true);
       return;
@@ -304,6 +316,21 @@ const useAudioTrimmer = () => {
     } finally {
       playPending.value = false;
     }
+  };
+
+  const beginScrub = () => {
+    if (!buffer.value || isScrubbing) return;
+    isScrubbing = true;
+    resumeAfterScrub = Boolean(source);
+    if (source) stopPlayback(true);
+  };
+
+  const endScrub = () => {
+    if (!isScrubbing) return;
+    isScrubbing = false;
+    const resume = resumeAfterScrub;
+    resumeAfterScrub = false;
+    if (resume) void togglePlayback();
   };
 
   const setLoopEnabled = (enabled: boolean) => {
@@ -403,10 +430,14 @@ const useAudioTrimmer = () => {
   };
 
   onDeactivated(() => {
+    isScrubbing = false;
+    resumeAfterScrub = false;
     invalidateExport();
     stopPlayback();
   });
   onUnmounted(() => {
+    isScrubbing = false;
+    resumeAfterScrub = false;
     loadId++;
     invalidateExport();
     stopPlayback();
@@ -437,6 +468,8 @@ const useAudioTrimmer = () => {
     selectAll,
     togglePlayback,
     seekPlayback,
+    beginScrub,
+    endScrub,
     setLoopEnabled,
     setGainDb,
     setFadeOutSeconds,

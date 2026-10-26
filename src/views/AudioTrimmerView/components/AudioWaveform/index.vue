@@ -23,6 +23,8 @@ interface Props {
 const $props = defineProps<Props>();
 const $emit = defineEmits<{
   "selection-change": [selection: AudioSelection];
+  "scrub-start": [];
+  "scrub-end": [];
   "zoom-change": [zoom: number];
   seek: [frame: number];
 }>();
@@ -31,8 +33,13 @@ const $emit = defineEmits<{
 const canvasRef = ref<HTMLCanvasElement>();
 /** 波形可见范围的起始帧 */
 const viewStartFrame = ref(0);
+/** 鼠标是否悬浮在可拖动边界 */
+const canDragEdge = ref(false);
 let resizeObserver: ResizeObserver | null = null;
 let dragEdge: "start" | "end" | null = null;
+let seekPointerId: number | null = null;
+let seekStartX = 0;
+let isScrubbing = false;
 let wheelAnchor: { frame: number; ratio: number } | null = null;
 
 const visibleFrames = computed(() => Math.max(1, Math.ceil($props.frameCount / $props.zoom)));
@@ -127,9 +134,23 @@ const drawWaveform = () => {
 
 const pointerToFrame = (event: PointerEvent) => {
   const rect = canvasRef.value?.getBoundingClientRect();
-  if (!rect) return 0;
+  if (!rect?.width) return 0;
   const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
   return Math.min($props.frameCount, Math.round(viewStartFrame.value + ratio * visibleFrames.value));
+};
+
+const getDragEdge = (event: PointerEvent) => {
+  const rect = canvasRef.value?.getBoundingClientRect();
+  if (!rect?.width) return null;
+  const x = event.clientX - rect.left;
+  if (x < 0 || x > rect.width) return null;
+  const frameToX = (frame: number) => ((frame - viewStartFrame.value) / visibleFrames.value) * rect.width;
+  const startX = frameToX($props.selection.startFrame);
+  const endX = frameToX($props.selection.endFrame);
+  const startDistance = startX >= 0 && startX <= rect.width ? Math.abs(x - startX) : Infinity;
+  const endDistance = endX >= 0 && endX <= rect.width ? Math.abs(x - endX) : Infinity;
+  if (Math.min(startDistance, endDistance) > 6) return null;
+  return startDistance <= endDistance ? "start" : "end";
 };
 
 const updateDrag = (event: PointerEvent) => {
@@ -139,23 +160,71 @@ const updateDrag = (event: PointerEvent) => {
     dragEdge === "start"
       ? { startFrame: Math.min(frame, $props.selection.endFrame - 1), endFrame: $props.selection.endFrame }
       : { startFrame: $props.selection.startFrame, endFrame: Math.max(frame, $props.selection.startFrame + 1) };
+  if (
+    selection.startFrame === $props.selection.startFrame &&
+    selection.endFrame === $props.selection.endFrame
+  )
+    return;
   $emit("selection-change", selection);
 };
 
-const startDrag = (event: PointerEvent) => {
-  const frame = pointerToFrame(event);
-  if ($props.isPlaying && frame >= $props.selection.startFrame && frame <= $props.selection.endFrame) {
-    $emit("seek", frame);
+const handlePointerMove = (event: PointerEvent) => {
+  if (dragEdge) {
+    updateDrag(event);
     return;
   }
-  dragEdge =
-    Math.abs(frame - $props.selection.startFrame) <= Math.abs(frame - $props.selection.endFrame) ? "start" : "end";
-  canvasRef.value?.setPointerCapture(event.pointerId);
-  updateDrag(event);
+  if (seekPointerId === event.pointerId) {
+    if (!isScrubbing && Math.abs(event.clientX - seekStartX) >= 3) {
+      isScrubbing = true;
+      $emit("scrub-start");
+    }
+    if (isScrubbing) $emit("seek", pointerToFrame(event));
+    return;
+  }
+  canDragEdge.value = getDragEdge(event) !== null;
 };
 
-const finishDrag = () => {
+const startDrag = (event: PointerEvent) => {
+  const edge = getDragEdge(event);
+  if (edge) {
+    dragEdge = edge;
+    canDragEdge.value = true;
+    canvasRef.value?.setPointerCapture(event.pointerId);
+    return;
+  }
+  const rect = canvasRef.value?.getBoundingClientRect();
+  if (!rect?.width) return;
+  const frame = viewStartFrame.value + ((event.clientX - rect.left) / rect.width) * visibleFrames.value;
+  if (frame > $props.selection.startFrame && frame < $props.selection.endFrame) {
+    seekPointerId = event.pointerId;
+    seekStartX = event.clientX;
+    canvasRef.value?.setPointerCapture(event.pointerId);
+  }
+};
+
+const finishDrag = (event: PointerEvent) => {
+  if (seekPointerId === event.pointerId) {
+    $emit("seek", pointerToFrame(event));
+    if (isScrubbing) $emit("scrub-end");
+    seekPointerId = null;
+    isScrubbing = false;
+  } else if (dragEdge) updateDrag(event);
   dragEdge = null;
+  canDragEdge.value = getDragEdge(event) !== null;
+};
+
+const cancelDrag = (event: PointerEvent) => {
+  if (seekPointerId === event.pointerId) {
+    if (isScrubbing) $emit("scrub-end");
+    seekPointerId = null;
+    isScrubbing = false;
+  }
+  dragEdge = null;
+  canDragEdge.value = getDragEdge(event) !== null;
+};
+
+const finishHover = () => {
+  if (!dragEdge && seekPointerId === null) canDragEdge.value = false;
 };
 
 const handleWheel = (event: WheelEvent) => {
@@ -216,12 +285,18 @@ onUnmounted(() => resizeObserver?.disconnect());
       <canvas
         ref="canvasRef"
         class="waveform"
-        :aria-label="isPlaying ? '音频波形，点击选区调整播放进度' : '音频波形，拖动两端边界调整选区'"
+        :class="{ 'is-draggable': canDragEdge }"
+        :aria-label="
+          isPlaying
+            ? '音频波形，拖动两端边界调整选区，点击或拖动选区调整播放进度'
+            : '音频波形，拖动两端边界调整选区，点击或拖动选区定位播放进度'
+        "
         @pointerdown="startDrag"
-        @pointermove="updateDrag"
+        @pointermove="handlePointerMove"
         @pointerup="finishDrag"
-        @pointercancel="finishDrag"
-        @lostpointercapture="finishDrag"
+        @pointercancel="cancelDrag"
+        @pointerleave="finishHover"
+        @lostpointercapture="cancelDrag"
         @wheel="handleWheel"
       />
     </div>
@@ -260,6 +335,10 @@ onUnmounted(() => resizeObserver?.disconnect());
       height: 100%;
       cursor: crosshair;
       touch-action: none;
+
+      &.is-draggable {
+        cursor: ew-resize;
+      }
     }
   }
 

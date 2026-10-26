@@ -216,6 +216,8 @@ const handleDrop = (event: DragEvent) => {
                 :is-playing="trimmer.isPlaying.value"
                 @selection-change="trimmer.setSelection"
                 @seek="trimmer.seekPlayback"
+                @scrub-start="trimmer.beginScrub"
+                @scrub-end="trimmer.endScrub"
                 @zoom-change="handleZoomChange"
               />
             </div>
