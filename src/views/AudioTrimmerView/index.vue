@@ -18,6 +18,7 @@ import AudioWaveform from "./components/AudioWaveform/index.vue";
 
 import MediaToolHeader from "@/components/MediaToolHeader/index.vue";
 import { useAudioTrimmer } from "@/composables/use-audio-trimmer";
+import { isAudioFile, useFilePaste } from "@/composables/use-file-paste";
 import { usePageScale } from "@/composables/use-page-scale";
 import { formatFileSize } from "@/utils/media";
 
@@ -31,6 +32,14 @@ const zoom = ref(1);
 const { pageScale } = usePageScale();
 const trimmer = useAudioTrimmer();
 let dragDepth = 0;
+
+useFilePaste(
+  isAudioFile,
+  () => !trimmer.isLoading.value,
+  (files) => {
+    void trimmer.loadFile(files[0]);
+  },
+);
 
 const duration = computed(() => trimmer.buffer.value?.duration ?? 0);
 const selectionDuration = computed(() => {
@@ -171,7 +180,7 @@ const handleDrop = (event: DragEvent) => {
 
           <div v-if="!trimmer.buffer.value" class="empty-state">
             <div class="upload-symbol"><LuUpload :size="34" aria-hidden="true" /></div>
-            <span class="empty-title">{{ trimmer.isLoading.value ? "正在读取音频" : "拖放音频到这里" }}</span>
+            <span class="empty-title">{{ trimmer.isLoading.value ? "正在读取音频" : "拖放或粘贴导入音频" }}</span>
             <span class="empty-detail">支持当前浏览器可解码的音频格式</span>
             <button type="button" class="select-button" :disabled="trimmer.isLoading.value" @click="openFilePicker">
               <LuFolderOpen :size="18" aria-hidden="true" /><span>选择音频</span>

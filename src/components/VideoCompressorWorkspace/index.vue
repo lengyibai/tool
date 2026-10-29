@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { LuFileWarning, LuFolderOpen, LuUpload } from "vue-icons-plus/lu";
 
 import SelectField, { type SelectFieldOption } from "@/components/SelectField/index.vue";
+import { useFilePaste } from "@/composables/use-file-paste";
 import type { VideoCompressionSettings } from "@/types/video-compressor";
 
 interface Props {
@@ -39,6 +40,12 @@ const fileInputRef = ref<HTMLInputElement>();
 const dragActive = ref(false);
 const canSelectFiles = computed(
   () => !$props.filesLocked && !$props.compatibilityPending && !$props.compatibilityError,
+);
+
+useFilePaste(
+  (file) => file.type === "video/mp4" || file.type === "video/quicktime" || /\.(mp4|mov)$/i.test(file.name),
+  () => canSelectFiles.value,
+  (files) => $emit("files-selected", files),
 );
 
 const handleSelectClick = () => {
@@ -178,7 +185,7 @@ const handleDrop = (event: DragEvent) => {
       <span class="upload-symbol" aria-hidden="true">
         <LuUpload :size="34" />
       </span>
-      <span class="drop-title">{{ compatibilityPending ? "正在检测浏览器能力" : "拖放视频到这里" }}</span>
+      <span class="drop-title">{{ compatibilityPending ? "正在检测浏览器能力" : "拖放或粘贴导入视频" }}</span>
       <span class="drop-subtitle">支持 MP4、MOV，可一次添加多个视频</span>
       <span v-if="compatibilityError" class="status-message is-error">
         <LuFileWarning :size="16" aria-hidden="true" />

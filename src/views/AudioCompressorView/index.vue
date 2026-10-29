@@ -12,6 +12,7 @@ import {
 
 import MediaToolHeader from "@/components/MediaToolHeader/index.vue";
 import { useAudioCompressor } from "@/composables/use-audio-compressor";
+import { isAudioFile, useFilePaste } from "@/composables/use-file-paste";
 import { usePageScale } from "@/composables/use-page-scale";
 import { formatFileSize, getSizeChange } from "@/utils/files";
 
@@ -23,6 +24,14 @@ const isDragging = ref(false);
 const { pageScale } = usePageScale();
 const compressor = useAudioCompressor();
 let dragDepth = 0;
+
+useFilePaste(
+  isAudioFile,
+  () => !compressor.isBusy.value,
+  (files) => {
+    void compressor.processFiles(files);
+  },
+);
 
 const formatDuration = (seconds: number) => {
   const wholeSeconds = Math.round(seconds);
@@ -130,7 +139,7 @@ const handleDrop = (event: DragEvent) => {
                 @change="handleFileChange"
               />
               <LuUpload class-name="upload-icon" :size="58" aria-hidden="true" />
-              <span class="drop-title">拖放音频到这里</span>
+              <span class="drop-title">拖放或粘贴导入音频</span>
               <span class="drop-subtitle">或从设备中选择，可一次处理多个文件</span>
               <span class="select-button">选择音频</span>
             </div>

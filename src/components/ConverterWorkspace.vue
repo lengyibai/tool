@@ -249,7 +249,7 @@ onUnmounted(removeWindowListeners);
         @change="handleInputChange"
       />
       <LuUpload class-name="upload-symbol" :size="66" aria-hidden="true" />
-      <span class="drop-title">拖放<span class="paste-hint">或粘贴</span>图片到这里</span>
+      <span class="drop-title">拖放或粘贴导入图片</span>
       <span class="drop-subtitle">或从设备中选择，可一次处理多张图片</span>
       <span class="select-button">选择图片</span>
     </div>
@@ -426,12 +426,6 @@ onUnmounted(removeWindowListeners);
     min-height: 280px;
     margin: 12px;
     padding: 32px 18px;
-  }
-
-  .drop-title {
-    > .paste-hint {
-      display: none;
-    }
   }
 
   .select-button {

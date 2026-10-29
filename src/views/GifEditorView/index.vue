@@ -15,6 +15,7 @@ import {
 } from "vue-icons-plus/lu";
 
 import MediaToolHeader from "@/components/MediaToolHeader/index.vue";
+import { useFilePaste } from "@/composables/use-file-paste";
 import { useGifEditor } from "@/composables/use-gif-editor";
 import { usePageScale } from "@/composables/use-page-scale";
 import type { GifCrop, GifQuality } from "@/types/gif-editor";
@@ -41,6 +42,14 @@ const { pageScale } = usePageScale();
 const editor = useGifEditor();
 let dragDepth = 0;
 let cropDrag: { mode: DragMode; x: number; y: number; initial: GifCrop } | null = null;
+
+useFilePaste(
+  (file) => file.type === "image/gif" || file.type.startsWith("video/") || /\.(gif|mp4|webm|mov|m4v)$/i.test(file.name),
+  () => !editor.isLoading.value,
+  (files) => {
+    void editor.loadFile(files[0]);
+  },
+);
 
 const cropStyle = computed(() => {
   const media = editor.source.value;
@@ -212,7 +221,7 @@ const resetCrop = () => {
           <input ref="fileInputRef" class="file-input" type="file" accept="image/gif,video/*,.gif,.mp4,.webm,.mov,.m4v" aria-label="选择 GIF 或视频文件" @change="handleFileChange" />
           <div v-if="!editor.source.value" class="empty-state">
             <div class="upload-symbol"><LuUpload :size="34" aria-hidden="true" /></div>
-            <span class="empty-title">{{ editor.isLoading.value ? "正在读取文件" : "拖放 GIF 或视频到这里" }}</span>
+            <span class="empty-title">{{ editor.isLoading.value ? "正在读取文件" : "拖放或粘贴导入 GIF、视频" }}</span>
             <span class="empty-detail">支持 GIF、MP4、WebM 及当前浏览器可解码的视频</span>
             <button type="button" class="select-button" :disabled="editor.isLoading.value" @click="openFilePicker"><LuFolderOpen :size="18" aria-hidden="true" /><span>选择文件</span></button>
           </div>
