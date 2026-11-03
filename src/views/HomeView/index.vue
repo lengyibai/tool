@@ -23,9 +23,18 @@ const tools = [
     tone: "mint",
   },
   {
+    path: "/png-indexed",
+    icon: LuFileImage,
+    eyebrow: "PNG / 02",
+    title: "PNG 索引色压缩",
+    description: "将少色 PNG 无损转换为索引色，保留原始尺寸与可见像素。",
+    detail: "自动保留体积更小的版本",
+    tone: "amber",
+  },
+  {
     path: "/video",
     icon: LuFilm,
-    eyebrow: "VIDEO / 02",
+    eyebrow: "VIDEO / 03",
     title: "视频压缩",
     description: "在浏览器本地压缩视频，快速得到更易分享、更省空间的文件。",
     detail: "支持 MP4、MOV 等常见格式",
@@ -34,7 +43,7 @@ const tools = [
   {
     path: "/audio",
     icon: LuAudioLines,
-    eyebrow: "AUDIO / 03",
+    eyebrow: "AUDIO / 04",
     title: "音频裁剪",
     description: "选择一段音频，试听并导出 MP3 文件。",
     detail: "支持波形选区与精确时间输入",
@@ -43,7 +52,7 @@ const tools = [
   {
     path: "/audio-compress",
     icon: LuFileAudio,
-    eyebrow: "AUDIO / 04",
+    eyebrow: "AUDIO / 05",
     title: "音频压缩",
     description: "批量将音频转换为 MP3，按原音码率设置输出上限。",
     detail: "逐项查看体积并批量下载",
@@ -52,7 +61,7 @@ const tools = [
   {
     path: "/gif",
     icon: LuImage,
-    eyebrow: "GIF / 05",
+    eyebrow: "GIF / 06",
     title: "GIF 编辑",
     description: "裁剪动画画面与时长，或把视频片段制作为 GIF。",
     detail: "先生成预览，再决定下载",

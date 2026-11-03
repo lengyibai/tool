@@ -15,6 +15,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "WebP 图片转换器" },
   },
   {
+    path: "/png-indexed",
+    name: "png-indexed-compressor",
+    component: () => import("@/views/PngCompressorView/index.vue"),
+    meta: { title: "PNG 索引色压缩" },
+  },
+  {
     path: "/video",
     name: "video-compressor",
     component: () => import("@/views/VideoCompressorView/index.vue"),
