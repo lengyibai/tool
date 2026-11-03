@@ -26,6 +26,7 @@ const resolutionOptions: SelectFieldOption[] = [
   { value: "original", label: "原始尺寸" },
   { value: "1080p", label: "1080p" },
   { value: "720p", label: "720p" },
+  { value: "480p", label: "480p" },
 ];
 
 const frameRateOptions: SelectFieldOption[] = [

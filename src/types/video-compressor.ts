@@ -1,6 +1,6 @@
 export type CompressionPreviewState = "idle" | "processing" | "complete" | "error";
 
-export type VideoOutputResolution = "original" | "1080p" | "720p";
+export type VideoOutputResolution = "original" | "1080p" | "720p" | "480p";
 
 export type VideoOutputFrameRate = "original" | "30" | "60";
 

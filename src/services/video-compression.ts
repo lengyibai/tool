@@ -30,7 +30,7 @@ interface VideoTransform extends VideoDimensions {
   targetHeight?: number;
 }
 
-type VideoQualityTier = "4k" | "2k" | "1080p" | "720p";
+type VideoQualityTier = "4k" | "2k" | "1080p" | "720p" | "480p";
 
 /** @description 视频元数据 */
 export interface VideoCompressionMetadata {
@@ -92,7 +92,8 @@ const resolveVideoTransform = (
   source: VideoDimensions,
   resolution: VideoCompressionSettings["resolution"],
 ): VideoTransform => {
-  const shortEdgeLimit = resolution === "1080p" ? 1080 : resolution === "720p" ? 720 : null;
+  const shortEdgeLimit =
+    resolution === "1080p" ? 1080 : resolution === "720p" ? 720 : resolution === "480p" ? 480 : null;
   const shortEdge = Math.min(source.width, source.height);
   if (!shortEdgeLimit || shortEdge <= shortEdgeLimit) return source;
 
@@ -126,6 +127,7 @@ const videoBitrateMap: Record<VideoQualityTier, Record<VideoCompressionQuality, 
   "2k": { low: 6_000_000, medium: 10_000_000, high: 16_000_000 },
   "1080p": { low: 3_000_000, medium: 6_000_000, high: 10_000_000 },
   "720p": { low: 1_500_000, medium: 3_000_000, high: 5_000_000 },
+  "480p": { low: 750_000, medium: 1_500_000, high: 2_500_000 },
 };
 
 const resolveVideoQualityTier = ({ width, height }: VideoDimensions): VideoQualityTier => {
@@ -133,7 +135,8 @@ const resolveVideoQualityTier = ({ width, height }: VideoDimensions): VideoQuali
   if (shortEdge >= 2160) return "4k";
   if (shortEdge >= 1440) return "2k";
   if (shortEdge >= 1080) return "1080p";
-  return "720p";
+  if (shortEdge >= 720) return "720p";
+  return "480p";
 };
 
 const describeDiscardedTrack = (reason: Conversion["discardedTracks"][number]["reason"]): string => {
