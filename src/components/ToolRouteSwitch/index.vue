@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import { LuAudioLines, LuFileAudio, LuFilm, LuImage, LuVideo } from "vue-icons-plus/lu";
+import { LuAudioLines, LuFileAudio, LuFileImage, LuFilm, LuImage, LuVideo } from "vue-icons-plus/lu";
 </script>
 
 <template>
@@ -8,6 +8,10 @@ import { LuAudioLines, LuFileAudio, LuFilm, LuImage, LuVideo } from "vue-icons-p
     <RouterLink to="/webp" exact-active-class="is-active" aria-label="切换到图片转换">
       <LuImage :size="17" aria-hidden="true" />
       <span>图片转换</span>
+    </RouterLink>
+    <RouterLink to="/png-indexed" exact-active-class="is-active" aria-label="切换到 PNG 索引色压缩">
+      <LuFileImage :size="17" aria-hidden="true" />
+      <span>PNG 索引色压缩</span>
     </RouterLink>
     <RouterLink to="/video" exact-active-class="is-active" aria-label="切换到视频压缩">
       <LuVideo :size="17" aria-hidden="true" />
@@ -31,7 +35,7 @@ import { LuAudioLines, LuFileAudio, LuFilm, LuImage, LuVideo } from "vue-icons-p
 <style scoped lang="less">
 .tool-route-switch {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   overflow: hidden;
   height: 50px;
   padding: 3px;
