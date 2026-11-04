@@ -8,7 +8,15 @@ import type { GifExportSettings, GifSource } from "@/types/gif-editor";
 
 const maxVideoDuration = 30;
 const maxFramePixels = 70_000_000;
+const maxGifFrameDelay = 655_350;
 const minFrameDelay = 0.02;
+
+interface PlannedFrame {
+  /** 原文件取帧时间，单位秒 */
+  time: number;
+  /** 导出帧延时，单位毫秒 */
+  delay: number;
+}
 
 const isGifFile = (file: File) => file.type === "image/gif" || file.name.toLowerCase().endsWith(".gif");
 
@@ -181,12 +189,14 @@ const renderSourceFrame = async (source: GifSource, time: number) => {
 };
 
 const validateExport = (source: GifSource, settings: GifExportSettings) => {
-  const { crop, width, height, frameRate, trimStart, trimEnd } = settings;
+  const { crop, width, height, frameRate, trimStart, trimEnd, speed } = settings;
   const selectedDuration = trimEnd - trimStart;
   if (!Number.isFinite(trimStart) || !Number.isFinite(trimEnd) || trimStart < 0 || trimEnd > source.duration + 0.001 || selectedDuration < 0.01)
     throw new Error("请选择有效的开始和结束时间。");
   if (source.kind === "video" && selectedDuration > maxVideoDuration + 0.001)
     throw new Error("视频选区最长支持 30 秒，请缩短开始与结束时间。");
+  if (!Number.isFinite(speed) || speed < 0.25 || speed > 4)
+    throw new Error("倍速必须在 0.25 到 4 之间。");
   if (
     ![crop.x, crop.y, crop.width, crop.height].every(Number.isFinite) ||
     crop.x < 0 ||
@@ -207,14 +217,76 @@ const validateExport = (source: GifSource, settings: GifExportSettings) => {
     throw new Error("原 GIF 帧率超过 30 fps，请选择固定导出帧率。");
   if (source.kind === "gif" && frameRate !== "original" && frameRate > gifFrames.length / source.duration)
     throw new Error("导出帧率不能高于原 GIF 的平均帧率。");
-  const frameCount = source.kind === "gif" && frameRate === "original"
+  const originalFrameCount = source.kind === "gif" && frameRate === "original"
     ? frameIndexAt(source, Math.min(source.duration, trimEnd - 0.000001)) - frameIndexAt(source, trimStart) + 1
-    : Math.ceil(selectedDuration * Number(frameRate));
-  if (frameRate === "original" && frameCount / selectedDuration > 30 + 0.001)
+    : 0;
+  if (frameRate === "original" && originalFrameCount / selectedDuration > 30 + 0.001)
     throw new Error("所选片段的原帧率超过 30 fps，请选择固定导出帧率。");
-  if (!frameCount || frameCount * width * height > maxFramePixels)
+  const framePlan = createFramePlan(source, settings);
+  if (!framePlan.length || framePlan.length * width * height > maxFramePixels)
     throw new Error("画面量过大，请降低帧率或缩小导出尺寸。");
-  return frameCount;
+  return framePlan;
+};
+
+/** @description 按导出时间轴取帧，并将过密的原 GIF 帧合并到 30 fps 以内 */
+const createFramePlan = (source: GifSource, settings: GifExportSettings): PlannedFrame[] => {
+  const { trimStart, trimEnd, speed, frameRate } = settings;
+  const samples: { time: number; duration: number }[] = [];
+  if (source.kind === "gif" && frameRate === "original") {
+    const frames = source.frames ?? [];
+    const firstIndex = frameIndexAt(source, trimStart);
+    const lastIndex = frameIndexAt(source, Math.min(source.duration, trimEnd - 0.000001));
+    let pending: { time: number; duration: number } | null = null;
+    for (let index = firstIndex; index <= lastIndex; index++) {
+      const frameStart = source.frameStarts?.[index] ?? 0;
+      const overlap = Math.min(trimEnd, frameStart + frameDelay(frames[index])) - Math.max(trimStart, frameStart);
+      if (overlap <= 0) continue;
+      if (!pending) pending = { time: Math.max(trimStart, frameStart), duration: 0 };
+      pending.duration += overlap / speed;
+      if (pending.duration >= 1 / 30 - 0.000001) {
+        samples.push(pending);
+        pending = null;
+      }
+    }
+    if (pending) {
+      if (samples.length) samples[samples.length - 1].duration += pending.duration;
+      else samples.push(pending);
+    }
+  } else {
+    const rate = Number(frameRate);
+    const outputDuration = (trimEnd - trimStart) / speed;
+    const count = Math.ceil(outputDuration * rate);
+    for (let index = 0; index < count; index++) {
+      const outputTime = index / rate;
+      samples.push({
+        time: Math.min(trimEnd - 0.000001, trimStart + outputTime * speed),
+        duration: Math.min(1 / rate, outputDuration - outputTime),
+      });
+    }
+  }
+
+  //GIF 延时以 10 毫秒为单位；累计舍入避免逐帧误差改变总时长。
+  let targetCentiseconds = 0;
+  let encodedCentiseconds = 0;
+  const plan = samples.map((sample) => {
+    targetCentiseconds += sample.duration * 100;
+    const delayCentiseconds = Math.max(2, Math.round(targetCentiseconds) - encodedCentiseconds);
+    encodedCentiseconds += delayCentiseconds;
+    return { time: sample.time, delay: delayCentiseconds * 10 };
+  });
+  if (plan.length) plan[plan.length - 1].delay += Math.max(0, Math.ceil(plan.length * 100 / 30 - encodedCentiseconds)) * 10;
+  //GIF 单帧延时最多为 655.35 秒，超出时重复画面以保留总时长。
+  return plan.flatMap((frame) => {
+    const parts: PlannedFrame[] = [];
+    let remaining = frame.delay;
+    while (remaining > maxGifFrameDelay) {
+      const delay = Math.min(maxGifFrameDelay, remaining - 20);
+      parts.push({ time: frame.time, delay });
+      remaining -= delay;
+    }
+    parts.push({ time: frame.time, delay: remaining });
+    return parts;
+  });
 };
 
 const cropFrame = (frame: HTMLCanvasElement | OffscreenCanvas, settings: GifExportSettings) => {
@@ -257,7 +329,7 @@ interface EncodeCallbacks {
 }
 
 const encodeGif = async (source: GifSource, settings: GifExportSettings, callbacks: EncodeCallbacks) => {
-  const frameCount = validateExport(source, settings);
+  const framePlan = validateExport(source, settings);
   const quality = { low: 30, medium: 15, high: 5 }[settings.quality];
   const dither: "Atkinson" | "FloydSteinberg-serpentine" | false = source.hasTransparency
     ? false
@@ -284,37 +356,22 @@ const encodeGif = async (source: GifSource, settings: GifExportSettings, callbac
   callbacks.signal.addEventListener("abort", abort, { once: true });
   try {
     const gifRenderer = source.kind === "gif" ? createGifFrameRenderer(source) : null;
-    if (source.kind === "gif" && settings.frameRate === "original") {
-      if (!gifRenderer) throw new Error("无法合成 GIF 帧。");
-      const frames = source.frames ?? [];
-      const firstIndex = frameIndexAt(source, settings.trimStart);
-      for (let index = firstIndex; index < firstIndex + frameCount; index++) {
-        if (callbacks.signal.aborted) throw new DOMException("已取消生成。", "AbortError");
-        const frameStart = source.frameStarts?.[index] ?? 0;
-        const overlap = Math.min(settings.trimEnd, frameStart + frameDelay(frames[index])) - Math.max(settings.trimStart, frameStart);
-        addFrame(gifRenderer.renderTo(index), Math.max(20, Math.round(overlap * 1000 / 10) * 10));
-        callbacks.onProgress(((index - firstIndex + 1) / frameCount) * 0.5);
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-      }
-    } else {
-      const rate = Number(settings.frameRate);
-      for (let index = 0; index < frameCount; index++) {
-        if (callbacks.signal.aborted) throw new DOMException("已取消生成。", "AbortError");
-        const time = settings.trimStart + index / rate;
-        const frame = gifRenderer ? gifRenderer.renderTo(frameIndexAt(source, time)) : await renderSourceFrame(source, time);
-        const delay = Math.max(20, Math.round((Math.min(settings.trimEnd, time + 1 / rate) - time) * 1000 / 10) * 10);
-        addFrame(frame, delay);
-        callbacks.onProgress(((index + 1) / frameCount) * 0.5);
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-      }
+    for (let index = 0; index < framePlan.length; index++) {
+      if (callbacks.signal.aborted) throw new DOMException("已取消生成。", "AbortError");
+      const { time, delay } = framePlan[index];
+      const frame = gifRenderer ? gifRenderer.renderTo(frameIndexAt(source, time)) : await renderSourceFrame(source, time);
+      addFrame(frame, delay);
+      callbacks.onProgress(((index + 1) / framePlan.length) * 0.5);
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
     }
     if (callbacks.signal.aborted) throw new DOMException("已取消生成。", "AbortError");
-    return await new Promise<Blob>((resolve, reject) => {
+    const blob = await new Promise<Blob>((resolve, reject) => {
       encoder.on("progress", (progress) => callbacks.onProgress(0.5 + progress * 0.5));
       encoder.once("finished", (blob) => resolve(blob));
       encoder.once("abort", () => reject(new DOMException("已取消生成。", "AbortError")));
       encoder.render();
     });
+    return { blob, duration: framePlan.reduce((sum, frame) => sum + frame.delay, 0) / 1000 };
   } finally {
     callbacks.signal.removeEventListener("abort", abort);
     if (encoder.running) encoder.abort();

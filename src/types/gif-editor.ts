@@ -65,6 +65,8 @@ interface GifExportSettings {
   quality: GifQuality;
   /** 导出帧率；原帧率仅用于 GIF 输入 */
   frameRate: number | "original";
+  /** 播放与导出倍速 */
+  speed: number;
 }
 
 export type { GifCrop, GifExportSettings, GifQuality, GifSource };

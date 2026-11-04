@@ -34,8 +34,12 @@ const useGifEditor = () => {
   const frameRate = ref<number | "original">(10);
   /** 固定导出帧率 */
   const fixedFrameRate = ref(10);
+  /** 播放与导出倍速 */
+  const speed = ref(1);
   /** 实际生成的 GIF */
   const previewBlob = shallowRef<Blob | null>(null);
+  /** 实际编码时长 */
+  const previewDuration = ref(0);
   /** 预览地址 */
   const previewUrl = ref("");
   /** 操作反馈 */
@@ -66,6 +70,7 @@ const useGifEditor = () => {
     ? Math.max(0.001, Math.min(30, Math.floor(originalFrameRate.value * 1000) / 1000))
     : 30);
   const selectedDuration = computed(() => Math.max(0, trimEnd.value - trimStart.value));
+  const outputDuration = computed(() => selectedDuration.value / speed.value);
   const selectedOriginalFrameRate = computed(() => {
     const media = source.value;
     if (media?.kind !== "gif" || !selectedDuration.value) return 0;
@@ -82,6 +87,7 @@ const useGifEditor = () => {
     if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
     previewUrl.value = "";
     previewBlob.value = null;
+    previewDuration.value = 0;
   };
 
   const cancelGeneration = () => {
@@ -132,7 +138,7 @@ const useGifEditor = () => {
 
   const tickPlayback = (timestamp: number) => {
     if (!isPlaying.value) return;
-    const next = playStartedFrom + (timestamp - playStartedAt) / 1000;
+    const next = playStartedFrom + (timestamp - playStartedAt) / 1000 * speed.value;
     if (next >= trimEnd.value) {
       stopPlayback();
       seek(trimStart.value);
@@ -171,6 +177,7 @@ const useGifEditor = () => {
     quality.value = "low";
     frameRate.value = 10;
     fixedFrameRate.value = 10;
+    speed.value = 1;
     isLoading.value = true;
     setStatus("正在读取文件…");
     try {
@@ -230,6 +237,18 @@ const useGifEditor = () => {
     quality.value = value;
   };
 
+  const setSpeed = (value: number) => {
+    if (!source.value || !Number.isFinite(value)) return;
+    const nextSpeed = clamp(Math.round(value * 100) / 100, 0.25, 4);
+    if (nextSpeed === speed.value) return;
+    if (isPlaying.value) {
+      playStartedFrom = currentTime.value;
+      playStartedAt = performance.now();
+    }
+    invalidateExport();
+    speed.value = nextSpeed;
+  };
+
   const setTrim = (start: number, end: number) => {
     const media = source.value;
     if (!media || !Number.isFinite(start) || !Number.isFinite(end)) return;
@@ -277,6 +296,7 @@ const useGifEditor = () => {
     height: exportDimensions.value.height,
     quality: quality.value,
     frameRate: frameRate.value,
+    speed: speed.value,
   });
 
   const generatePreview = async () => {
@@ -297,7 +317,7 @@ const useGifEditor = () => {
     progress.value = 0;
     setStatus("正在生成 GIF 预览…");
     try {
-      const blob = await encodeGif(media, options, {
+      const { blob, duration } = await encodeGif(media, options, {
         signal: controller.signal,
         onProgress: (value) => {
           if (activeGeneration === generationId) progress.value = Math.round(value * 100);
@@ -305,6 +325,7 @@ const useGifEditor = () => {
       });
       if (activeGeneration !== generationId || controller.signal.aborted) return;
       previewBlob.value = blob;
+      previewDuration.value = duration;
       previewUrl.value = URL.createObjectURL(blob);
       setStatus("预览已生成，确认效果后可下载 GIF。");
     } catch (error) {
@@ -343,6 +364,7 @@ const useGifEditor = () => {
     trimStart,
     trimEnd,
     selectedDuration,
+    outputDuration,
     isPlaying,
     isLoading,
     isGenerating,
@@ -352,11 +374,13 @@ const useGifEditor = () => {
     quality,
     frameRate,
     fixedFrameRate,
+    speed,
     originalFrameRate,
     selectedOriginalFrameRate,
     canPreserveOriginalTiming,
     frameRateLimit,
     previewBlob,
+    previewDuration,
     previewUrl,
     status,
     exportDimensions,
@@ -366,6 +390,7 @@ const useGifEditor = () => {
     setCrop,
     setMaxEdge,
     setQuality,
+    setSpeed,
     setTrimStart,
     setTrimEnd,
     setFrameRate,

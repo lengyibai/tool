@@ -280,7 +280,12 @@
       font-variant-numeric: tabular-nums;
     }
 
-    > .trim-heading > span:first-child { color: @text; font-size: 13px; font-weight: bold; }
+    > .trim-heading {
+      flex-wrap: wrap;
+      gap: var(--gap-1);
+
+      > span:first-child { color: @text; font-size: 13px; font-weight: bold; }
+    }
 
     > .trim-timeline {
       position: relative;

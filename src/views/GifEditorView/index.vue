@@ -188,6 +188,11 @@ const changeTrimEnd = (event: Event) => {
   event.target.value = String(editor.trimEnd.value);
   if (event.type === "change") editor.seek(editor.currentTime.value);
 };
+const changeSpeed = (event: Event) => {
+  if (!(event.target instanceof HTMLInputElement)) return;
+  editor.setSpeed(Number(event.target.value));
+  event.target.value = String(editor.speed.value);
+};
 
 const changeMaxEdge = (event: Event) => {
   if (!(event.target instanceof HTMLInputElement)) return;
@@ -242,7 +247,7 @@ const resetCrop = () => {
                 </div>
               </div>
               <div v-if="editor.previewUrl.value" class="preview-area">
-                <div class="preview-heading"><LuEye :size="17" aria-hidden="true" /><span>生成结果预览</span><span class="preview-meta">{{ editor.exportDimensions.value.width }} × {{ editor.exportDimensions.value.height }} · {{ editor.selectedDuration.value.toFixed(2) }} 秒 · {{ formatFileSize(editor.previewBlob.value?.size ?? 0) }}</span></div>
+                <div class="preview-heading"><LuEye :size="17" aria-hidden="true" /><span>生成结果预览</span><span class="preview-meta">{{ editor.exportDimensions.value.width }} × {{ editor.exportDimensions.value.height }} · {{ editor.previewDuration.value.toFixed(2) }} 秒 · {{ formatFileSize(editor.previewBlob.value?.size ?? 0) }}</span></div>
                 <img :src="editor.previewUrl.value" alt="已生成的 GIF 动画预览" />
               </div>
             </div>
@@ -254,7 +259,7 @@ const resetCrop = () => {
               <span class="transport-duration">{{ formatTime(editor.trimEnd.value) }}</span>
             </div>
             <input class="seek-bar" type="range" step="0.01" :min="editor.trimStart.value" :max="editor.trimEnd.value" :value="editor.currentTime.value" aria-label="预览位置" @input="seekPreview" />
-            <div class="trim-heading"><span>时间修剪</span><span>{{ editor.selectedDuration.value.toFixed(2) }} 秒</span></div>
+            <div class="trim-heading"><span>时间修剪</span><span>{{ editor.selectedDuration.value.toFixed(2) }} 秒 · 导出约 {{ editor.outputDuration.value.toFixed(2) }} 秒</span></div>
             <div class="trim-timeline">
               <div class="trim-rail"></div>
               <div class="trim-selection" :style="trimSelectionStyle"></div>
@@ -274,6 +279,7 @@ const resetCrop = () => {
               <label class="number-field"><span>开始</span><div class="input-wrap"><input type="number" min="0" step="0.001" :max="editor.trimEnd.value" :value="Number(editor.trimStart.value.toFixed(3))" :disabled="!editor.source.value" @change="changeTrimStart" /><span>秒</span></div></label>
               <label class="number-field"><span>结束</span><div class="input-wrap"><input type="number" min="0" step="0.001" :max="editor.source.value?.duration || 0" :value="Number(editor.trimEnd.value.toFixed(3))" :disabled="!editor.source.value" @change="changeTrimEnd" /><span>秒</span></div></label>
             </div>
+            <label class="number-field"><span>倍速</span><div class="input-wrap"><input type="number" min="0.25" max="4" step="0.01" :value="editor.speed.value" :disabled="!editor.source.value" @change="changeSpeed" /><span>×</span></div></label>
             <span v-if="editor.source.value?.kind === 'video' && editor.selectedDuration.value > 30" class="trim-warning">视频选区最长为 30 秒</span>
           </div>
           <div class="control-section">
