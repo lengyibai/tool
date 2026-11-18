@@ -610,6 +610,13 @@
   resolved "https://registry.yarnpkg.com/@ungap/structured-clone/-/structured-clone-1.4.0.tgz#5e2e1374c0a30b5a42e8b083523a225c6945f88a"
   integrity sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==
 
+"@upng/upng-js@2.2.2":
+  version "2.2.2"
+  resolved "https://registry.yarnpkg.com/@upng/upng-js/-/upng-js-2.2.2.tgz#a5c8c76812f04a086a8bc33c00b536d04f919a7e"
+  integrity sha512-Z+sYAXP8ndbwXpyBj+jszsxS7kmstsiCOSfwzJ5qyqQwEuSZ0OZBn7x52hzhy1btQoZck3PXxWNsGDAs8Bsw7g==
+  dependencies:
+    pako "^2.1.0"
+
 "@vitejs/plugin-vue@^5.0.4":
   version "5.2.4"
   resolved "https://registry.yarnpkg.com/@vitejs/plugin-vue/-/plugin-vue-5.2.4.tgz#9e8a512eb174bfc2a333ba959bbf9de428d89ad8"
@@ -2769,6 +2776,11 @@ p-locate@^5.0.0:
   integrity sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==
   dependencies:
     p-limit "^3.0.2"
+
+pako@^2.1.0:
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/pako/-/pako-2.2.0.tgz#246b9d4c841a8d308e484c0d03786651b143e63a"
+  integrity sha512-zJq6RP/5q+TO2OpFV3FHzlPnFjmkb7Nc99a5SNjJE+uu/PkpChs+NIZSSzbBoD+6kjiISXjfYdwj1ZRQ81dz/w==
 
 pako@~1.0.2:
   version "1.0.11"

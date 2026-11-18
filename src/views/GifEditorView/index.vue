@@ -18,6 +18,7 @@ import MediaToolHeader from "@/components/MediaToolHeader/index.vue";
 import { useFilePaste } from "@/composables/use-file-paste";
 import { useGifEditor } from "@/composables/use-gif-editor";
 import { usePageScale } from "@/composables/use-page-scale";
+import { maxGifExportFrameRate } from "@/services/gif-editor";
 import type { GifCrop, GifQuality } from "@/types/gif-editor";
 import { formatFileSize } from "@/utils/media";
 
@@ -293,7 +294,7 @@ const resetCrop = () => {
               <button v-for="option in qualityOptions" :key="option.value" type="button" :aria-pressed="editor.quality.value === option.value" :disabled="!editor.source.value" @click="editor.setQuality(option.value)">{{ option.label }}</button>
             </div>
             <label class="number-field"><span>帧率</span><div class="input-wrap"><input type="number" min="0.001" step="0.001" :max="editor.frameRateLimit.value" :value="editor.fixedFrameRate.value" :disabled="!editor.source.value || editor.frameRate.value === 'original'" @change="changeFrameRate" /><span>fps</span></div></label>
-            <label v-if="editor.source.value?.kind === 'gif'" class="check-row"><input type="checkbox" :checked="editor.frameRate.value === 'original'" :disabled="!editor.canPreserveOriginalTiming.value" @change="toggleOriginalFrameRate" /><span>保留原帧时长（选区平均 {{ editor.selectedOriginalFrameRate.value.toFixed(2) }} fps{{ !editor.canPreserveOriginalTiming.value ? '，超过 30 fps 上限' : '' }}）</span></label>
+            <label v-if="editor.source.value?.kind === 'gif'" class="check-row"><input type="checkbox" :checked="editor.frameRate.value === 'original'" :disabled="!editor.canPreserveOriginalTiming.value" @change="toggleOriginalFrameRate" /><span>保留原帧时长（选区平均 {{ editor.selectedOriginalFrameRate.value.toFixed(2) }} fps{{ !editor.canPreserveOriginalTiming.value ? `，超过 ${maxGifExportFrameRate} fps 上限` : '' }}）</span></label>
           </div>
           <div
             class="status-line"

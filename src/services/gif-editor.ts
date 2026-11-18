@@ -1,3 +1,4 @@
+import { clamp } from "es-toolkit/math";
 import Gif from "gif.js/dist/gif.js";
 import workerUrl from "gif.js/dist/gif.worker.js?url";
 import { decompressFrames, parseGIF } from "gifuct-js";
@@ -7,9 +8,10 @@ import type { ParsedFrame } from "gifuct-js";
 import type { GifExportSettings, GifSource } from "@/types/gif-editor";
 
 const maxVideoDuration = 30;
+const maxGifExportFrameRate = 60;
 const maxFramePixels = 70_000_000;
 const maxGifFrameDelay = 655_350;
-const minFrameDelay = 0.02;
+const minGifFrameDelay = 10;
 
 interface PlannedFrame {
   /** 原文件取帧时间，单位秒 */
@@ -27,7 +29,7 @@ const createCanvas = (width: number, height: number) => {
   return canvas;
 };
 
-const frameDelay = (frame: ParsedFrame) => Math.max(minFrameDelay, (frame.delay ?? 100) / 1000);
+const frameDelay = (frame: ParsedFrame) => Math.max(minGifFrameDelay, frame.delay ?? 100) / 1000;
 
 const hasTransparentPixels = (pixels: Uint8ClampedArray) => {
   for (let index = 3; index < pixels.length; index += 4) {
@@ -188,6 +190,12 @@ const renderSourceFrame = async (source: GifSource, time: number) => {
   return result.canvas;
 };
 
+const getFixedFrameRateLimit = (source: GifSource | null, speed: number) => {
+  if (source?.kind !== "gif") return maxGifExportFrameRate;
+  const scaledFrameRate = ((source.frames?.length ?? 0) / source.duration) * speed;
+  return clamp(Math.floor(scaledFrameRate * 1000 + 1e-9) / 1000, 0.001, maxGifExportFrameRate);
+};
+
 const validateExport = (source: GifSource, settings: GifExportSettings) => {
   const { crop, width, height, frameRate, trimStart, trimEnd, speed } = settings;
   const selectedDuration = trimEnd - trimStart;
@@ -209,26 +217,27 @@ const validateExport = (source: GifSource, settings: GifExportSettings) => {
     throw new Error("裁剪区域必须位于原始画面内。");
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 1024 || height > 1024 || width > crop.width || height > crop.height)
     throw new Error("导出宽高不能超过裁剪区域的原始尺寸或 1024 像素。");
-  if (frameRate !== "original" && (!Number.isFinite(frameRate) || frameRate < 0.001 || frameRate > 30))
+  if (frameRate !== "original" && (!Number.isFinite(frameRate) || frameRate < 0.001))
     throw new Error("请输入有效的导出帧率。");
+  const frameRateLimit = getFixedFrameRateLimit(source, speed);
+  if (frameRate !== "original" && frameRate > frameRateLimit)
+    throw new Error(`当前倍速下，导出帧率不能高于 ${frameRateLimit} fps。`);
   if (source.kind === "video" && frameRate === "original") throw new Error("视频需要选择固定导出帧率。");
   const gifFrames = source.frames ?? [];
-  if (source.kind === "gif" && frameRate === "original" && gifFrames.length / source.duration > 30)
-    throw new Error("原 GIF 帧率超过 30 fps，请选择固定导出帧率。");
-  if (source.kind === "gif" && frameRate !== "original" && frameRate > gifFrames.length / source.duration)
-    throw new Error("导出帧率不能高于原 GIF 的平均帧率。");
+  if (source.kind === "gif" && frameRate === "original" && gifFrames.length / source.duration > maxGifExportFrameRate)
+    throw new Error(`原 GIF 帧率超过 ${maxGifExportFrameRate} fps，请选择固定导出帧率。`);
   const originalFrameCount = source.kind === "gif" && frameRate === "original"
     ? frameIndexAt(source, Math.min(source.duration, trimEnd - 0.000001)) - frameIndexAt(source, trimStart) + 1
     : 0;
-  if (frameRate === "original" && originalFrameCount / selectedDuration > 30 + 0.001)
-    throw new Error("所选片段的原帧率超过 30 fps，请选择固定导出帧率。");
+  if (frameRate === "original" && originalFrameCount / selectedDuration > maxGifExportFrameRate + 0.001)
+    throw new Error(`所选片段的原帧率超过 ${maxGifExportFrameRate} fps，请选择固定导出帧率。`);
   const framePlan = createFramePlan(source, settings);
   if (!framePlan.length || framePlan.length * width * height > maxFramePixels)
     throw new Error("画面量过大，请降低帧率或缩小导出尺寸。");
   return framePlan;
 };
 
-/** @description 按导出时间轴取帧，并将过密的原 GIF 帧合并到 30 fps 以内 */
+/** @description 按导出时间轴取帧，并合并超过导出帧率上限的原 GIF 帧 */
 const createFramePlan = (source: GifSource, settings: GifExportSettings): PlannedFrame[] => {
   const { trimStart, trimEnd, speed, frameRate } = settings;
   const samples: { time: number; duration: number }[] = [];
@@ -243,7 +252,7 @@ const createFramePlan = (source: GifSource, settings: GifExportSettings): Planne
       if (overlap <= 0) continue;
       if (!pending) pending = { time: Math.max(trimStart, frameStart), duration: 0 };
       pending.duration += overlap / speed;
-      if (pending.duration >= 1 / 30 - 0.000001) {
+      if (pending.duration >= 1 / maxGifExportFrameRate - 0.000001) {
         samples.push(pending);
         pending = null;
       }
@@ -270,17 +279,20 @@ const createFramePlan = (source: GifSource, settings: GifExportSettings): Planne
   let encodedCentiseconds = 0;
   const plan = samples.map((sample) => {
     targetCentiseconds += sample.duration * 100;
-    const delayCentiseconds = Math.max(2, Math.round(targetCentiseconds) - encodedCentiseconds);
+    const delayCentiseconds = Math.max(minGifFrameDelay / 10, Math.round(targetCentiseconds) - encodedCentiseconds);
     encodedCentiseconds += delayCentiseconds;
     return { time: sample.time, delay: delayCentiseconds * 10 };
   });
-  if (plan.length) plan[plan.length - 1].delay += Math.max(0, Math.ceil(plan.length * 100 / 30 - encodedCentiseconds)) * 10;
+  if (plan.length) {
+    const minTotalCentiseconds = Math.ceil((plan.length * 100) / maxGifExportFrameRate);
+    plan[plan.length - 1].delay += Math.max(0, minTotalCentiseconds - encodedCentiseconds) * 10;
+  }
   //GIF 单帧延时最多为 655.35 秒，超出时重复画面以保留总时长。
   return plan.flatMap((frame) => {
     const parts: PlannedFrame[] = [];
     let remaining = frame.delay;
     while (remaining > maxGifFrameDelay) {
-      const delay = Math.min(maxGifFrameDelay, remaining - 20);
+      const delay = Math.min(maxGifFrameDelay, remaining - minGifFrameDelay);
       parts.push({ time: frame.time, delay });
       remaining -= delay;
     }
@@ -381,4 +393,12 @@ const encodeGif = async (source: GifSource, settings: GifExportSettings, callbac
   }
 };
 
-export { encodeGif, frameIndexAt, loadGifSource, renderSourceFrame, validateExport };
+export {
+  encodeGif,
+  frameIndexAt,
+  getFixedFrameRateLimit,
+  loadGifSource,
+  maxGifExportFrameRate,
+  renderSourceFrame,
+  validateExport,
+};

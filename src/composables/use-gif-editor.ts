@@ -1,6 +1,14 @@
 import { computed, onUnmounted, ref, shallowRef, triggerRef } from "vue";
 
-import { encodeGif, frameIndexAt, loadGifSource, renderSourceFrame, validateExport } from "@/services/gif-editor";
+import {
+  encodeGif,
+  frameIndexAt,
+  getFixedFrameRateLimit,
+  loadGifSource,
+  maxGifExportFrameRate,
+  renderSourceFrame,
+  validateExport,
+} from "@/services/gif-editor";
 import type { GifCrop, GifExportSettings, GifQuality, GifSource } from "@/types/gif-editor";
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -66,9 +74,7 @@ const useGifEditor = () => {
     const media = source.value;
     return media?.kind === "gif" ? (media.frames?.length ?? 0) / media.duration : 0;
   });
-  const frameRateLimit = computed(() => source.value?.kind === "gif"
-    ? Math.max(0.001, Math.min(30, Math.floor(originalFrameRate.value * 1000) / 1000))
-    : 30);
+  const frameRateLimit = computed(() => getFixedFrameRateLimit(source.value, speed.value));
   const selectedDuration = computed(() => Math.max(0, trimEnd.value - trimStart.value));
   const outputDuration = computed(() => selectedDuration.value / speed.value);
   const selectedOriginalFrameRate = computed(() => {
@@ -77,7 +83,11 @@ const useGifEditor = () => {
     const count = frameIndexAt(media, Math.max(trimStart.value, trimEnd.value - 0.000001)) - frameIndexAt(media, trimStart.value) + 1;
     return count / selectedDuration.value;
   });
-  const canPreserveOriginalTiming = computed(() => originalFrameRate.value <= 30 && selectedOriginalFrameRate.value <= 30);
+  const canPreserveOriginalTiming = computed(
+    () =>
+      originalFrameRate.value <= maxGifExportFrameRate &&
+      selectedOriginalFrameRate.value <= maxGifExportFrameRate + 0.001,
+  );
 
   const setStatus = (message: string, isError = false) => {
     status.value = { message, isError };
@@ -247,6 +257,8 @@ const useGifEditor = () => {
     }
     invalidateExport();
     speed.value = nextSpeed;
+    fixedFrameRate.value = Math.min(fixedFrameRate.value, frameRateLimit.value);
+    if (frameRate.value !== "original") frameRate.value = fixedFrameRate.value;
   };
 
   const setTrim = (start: number, end: number) => {
